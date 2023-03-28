@@ -1,0 +1,288 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Banking System Test</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
+    <script>
+        $(function () {
+            $('#login-form').submit(function (event) {
+                event.preventDefault();
+
+                var userid = $('#login-form-userid').val();
+                var password = $('#login-form-password').val();
+
+                $.ajax({
+                    url: 'api/authentication/login',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        userId: userid,
+                        password: password
+                    }),
+                    success: function (result) {
+                        console.log(result);
+                        window.jwtToken = result.token;
+                        window.currectUser = result.user;
+                        showAccountsListPage();
+                    },
+                    error: function (xhr, status, error) {
+                        var errorLabel = $('#login-form-error');
+                        errorLabel.css("display", "block");
+                        errorLabel.html(xhr.responseText)
+                        console.log(xhr.responseText);
+                        // handle login error
+                    }
+                });
+            });
+
+            $('#signup-form').submit(function (event) {
+                event.preventDefault();
+
+                var userid = $('#signup-form-userid').val();
+                var firstname = $('#signup-form-firstname').val();
+                var lastname = $('#signup-form-lastname').val();
+                var email = $('#signup-form-email').val();
+                var password = $('#signup-form-password').val();
+
+                $.ajax({
+                    url: 'api/authentication/signup',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        userid: userid,
+                        firstname: firstname,
+                        lastname: lastname,
+                        email: email,
+                        password: password
+                    }),
+                    success: function (result) {
+                        console.log(result);
+                        alert('OK');
+                        showPage('loginPage');
+                    },
+                    error: function (xhr, status, error) {
+                        var errorLabel = $('#signup-form-error');
+                        errorLabel.css("display", "block");
+                        errorLabel.html(xhr.responseText)
+                        console.log(xhr.responseText);
+                    }
+                });
+            });
+
+            $('#create-account-form').submit(function (event) {
+                event.preventDefault();
+                var accountName = $('#new-account-name').val();
+                $.ajax({
+                    url: 'api/account/create',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    headers: { "Authorization": 'Bearer ' + window.jwtToken },
+                    data: JSON.stringify({
+                        accountName: accountName,
+                        userId: window.currectUser.id
+                    }),
+                    success: function (result) {
+                        console.log(result);
+                        alert('OK');
+                        showAccountsListPage();
+                        $('#new-account-name').val("");
+                    },
+                    error: function (xhr, status, error) {
+                        var errorLabel = $('#create-account-error');
+                        errorLabel.css("display", "block");
+                        errorLabel.html(xhr.responseText)
+                        console.log(xhr.responseText);
+                    }
+                });
+            });
+        });
+        var currentPageId = 'loginPage';
+        function showPage(id) {
+            if (currentPageId != null) {
+                $('#' + currentPageId).css("display", "none");
+            }
+            $('#' + id).css("display", "block");
+            currentPageId = id;
+        }
+
+        function showAccountsListPage() {
+            showPage('AccountsListPage')
+            $('#usern-nameTag').html('Welcome ' + window.currectUser.firstName ?? window.currectUser.id)
+            loadAccounts();
+        }
+
+        function loadAccounts() {
+            $.ajax({
+                url: 'api/account/',
+                type: 'GET',
+                contentType: 'application/json',
+                headers: { "Authorization": 'Bearer ' + window.jwtToken },
+                success: function (result) {
+                    console.log(result);
+                    window.userAccounts = [];
+                    let accountsTable = $('#accountsTable')
+                    $('#accountsTable tr').remove()
+                    for (let i = 0; i < result.length; i++) {
+                        window.userAccounts[result[i].id] = result[i];
+                        accountsTable.append($('<tr>')
+                            .append($('<td>').html(result[i].name))
+                            .append($('<td>').html('$' + result[i].balance))
+                            .append($('<td>').html('<a href=\"\" onclick=\"showAccountPage(\'' + result[i].id + '\'); event.preventDefault()\">Open</a>')));
+                    }
+                },
+                error: function (xhr, status, error) {
+                    var errorLabel = $('#account-list-error');
+                    errorLabel.css("display", "block");
+                    errorLabel.html(xhr.responseText)
+                    console.log(xhr.responseText);
+                }
+            });
+        }
+
+        function showAccountPage(id) {
+            window.currentAccount = window.userAccounts[id];
+            showPage('AccountPage')
+            $('#account-nameTag').html(currentAccount.name);
+            $('#balance-tag').html('Currect balance: $' + currentAccount.balance);
+            $('#account-form-value').val("");
+        };
+
+        function Credit() {
+            var value = $('#account-form-value').val();
+            Update(value)
+        }
+        function Debit() {
+            var value = $('#account-form-value').val();
+            Update('-' + value)
+        }
+        function Update(value) {
+            $.ajax({
+                url: 'api/account/update',
+                type: 'POST',
+                contentType: 'application/json',
+                headers: { "Authorization": 'Bearer ' + window.jwtToken },
+                data: JSON.stringify({
+                    id: window.currentAccount.id,
+                    value: value
+                }),
+                success: function (result) {
+                    alert('OK');
+                    showAccountsListPage();
+                },
+                error: function (xhr, status, error) {
+                    var errorLabel = $('#account-error');
+                    errorLabel.css("display", "block");
+                    errorLabel.html(xhr.responseText)
+                    console.log(xhr.responseText);
+                    // handle login error
+                }
+            });
+        }
+
+        function Delete(value) {
+            $.ajax({
+                url: 'api/account/delete?id=' + window.currentAccount.id,
+                type: 'DELETE',
+                contentType: 'application/json',
+                headers: { "Authorization": 'Bearer ' + window.jwtToken },
+                success: function (result) {
+                    alert('OK');
+                    showAccountsListPage();
+                },
+                error: function (xhr, status, error) {
+                    var errorLabel = $('#account-error');
+                    errorLabel.css("display", "block");
+                    errorLabel.html(xhr.responseText)
+                    console.log(xhr.responseText);
+                    // handle login error
+                }
+            });
+        }
+
+    </script>
+</head>
+<body>
+    <h1>Welcome to the Banking System Test</h1>
+    <hr />
+    <div id="loginPage">
+        <h2>Login for existing users</h2>
+        <form id="login-form">
+            <label for="username">User ID:</label>
+            <input type="text" name="userid" id="login-form-userid">
+            <br />
+            <label for="password">Password:</label>
+            <input type="password" name="password" id="login-form-password">
+            <br />
+            <p id="login-form-error" style="color:red"></p>
+            <button type="submit">Log In</button>
+            <p>Not using Online Banking? <a href="" onclick="showPage('SignupPage');event.preventDefault()">Enroll now</a></p>
+        </form>
+    </div>
+
+    <div id="SignupPage" style="display:none">
+        <h2>Sign up for a new user</h2>
+        <form id="signup-form">
+            <label for="username">User ID:</label>
+            <input type="text" name="userid" id="signup-form-userid">
+            <br />
+            <label for="username">First Name:</label>
+            <input type="text" name="firstname" id="signup-form-firstname">
+            <br />
+            <label for="username">Last Name:</label>
+            <input type="text" name="lastname" id="signup-form-lastname">
+            <br />
+            <label for="password">Email:</label>
+            <input type="text" name="email" id="signup-form-email">
+            <br />
+            <label for="password">Password:</label>
+            <input type="password" name="password" id="signup-form-password">
+            <br />
+            <p id="signup-form-error" style="color:red"></p>
+            <button type="submit">Register</button>
+            <p>Already have an account? <a href="" onclick="showPage('loginPage');event.preventDefault()">Log In</a></p>
+        </form>
+    </div>
+
+    <div id="AccountsListPage" style="display:none">
+        <h2 id="usern-nameTag">Welcome [NAME]</h2>
+        <h3>Your accounts:</h3>
+        <p id="account-list-error" style="color:red"></p>
+        <table id="accountsTable" style="border-bottom: 1px solid; text-align: left;">
+            <tr>
+                <th>Name</th>
+                <th>Balance</th>
+                <th></th>
+            </tr>
+        </table>
+        <br />
+        <br />
+        <form id="create-account-form">
+            <label for="username">Create a New Account:</label>
+            <input type="text" name="userid" id="new-account-name">
+            <button type="submit">Create</button>
+            <br />
+            <p id="create-account-error" style="color:red"></p>
+        </form>
+    </div>
+
+    <div id="AccountPage" style="display:none">
+        <h2 id="account-nameTag">[Account]</h2>
+        <h3 id="balance-tag">Current balance: </h3>
+        <form id="account-form">
+            <label for="username">Enter amount:</label>
+            <input type="text" name="userid" id="account-form-value">
+            <button type="button" onclick="Credit()">Add</button>
+            <button type="button" onclick="Debit()">Withdraw</button>
+            <br />
+            <p id="account-error" style="color:red"></p>
+            <button type="button" onclick="Delete()">Delete Account</button>
+            <br />
+            <br />
+            <a href="" onclick="showAccountsListPage(); event.preventDefault()">Return</a>
+        </form>
+    </div>
+    <hr />
+    <h5>Developed by Dmitry Petrov for Radancy interview March 2023</h5>
+</body>
+</html>
